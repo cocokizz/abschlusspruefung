@@ -1,5 +1,6 @@
 {
   "name": "Interaktives Quiz",
   "description": "Eine interaktive Quiz-Anwendung mit Timer, Text-to-Speech-Funktion und Ergebnisbewertung, erstellt mit React und Tailwind CSS.",
-  "requestFramePermissions": []
+  "requestFramePermissions": [],
+  "prompt": ""
 }
