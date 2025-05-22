@@ -6,18 +6,19 @@ interface TimerDisplayProps {
   initialTime: number; // in seconds
   onTimeUp: () => void;
   isRunning: boolean;
+  timerLabel: string; // Wird von App.tsx übergeben
 }
 
-const TimerDisplay: React.FC<TimerDisplayProps> = ({ initialTime, onTimeUp, isRunning }) => {
+const TimerDisplay: React.FC<TimerDisplayProps> = ({ initialTime, onTimeUp, isRunning, timerLabel }) => {
   const [timeLeft, setTimeLeft] = useState(initialTime);
 
   useEffect(() => {
-    setTimeLeft(initialTime); // Reset timer when initialTime changes (e.g. on quiz reset)
+    setTimeLeft(initialTime);
   }, [initialTime]);
 
   useEffect(() => {
     if (!isRunning || timeLeft <= 0) {
-      if (timeLeft <= 0 && isRunning) { // Ensure onTimeUp is called only once when time runs out
+      if (timeLeft <= 0 && isRunning) {
         onTimeUp();
       }
       return;
@@ -39,7 +40,7 @@ const TimerDisplay: React.FC<TimerDisplayProps> = ({ initialTime, onTimeUp, isRu
   return (
     <div className="flex items-center space-x-2 text-darkgray p-2 bg-white rounded-lg shadow">
       <ClockIcon className="w-5 h-5 text-primary" />
-      <span className="text-lg font-medium">Restzeit: {formatTime(timeLeft)}</span>
+      <span className="text-lg font-medium">{timerLabel || "Restzeit:"} {formatTime(timeLeft)}</span>
     </div>
   );
 };

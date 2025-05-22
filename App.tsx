@@ -1,15 +1,46 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { QUIZ_QUESTIONS, TOTAL_QUIZ_TIME } from './constants';
-import { Question, QuestionType, UserAnswer, QuizStatus, AnswerOption, QuestionResult } from './types';
+import { Question, QuestionType, QuizStatus, QuestionResult } from './types';
 import QuestionDisplay from './components/QuestionDisplay';
 import TimerDisplay from './components/TimerDisplay';
 import ResultsDisplay from './components/ResultsDisplay';
 import Sidebar from './components/Sidebar';
 import { ChevronLeftIcon, ChevronRightIcon, CheckIcon as SubmitIcon } from './components/icons';
 
+// UI Text Konstanten (Deutsch)
+const UI_TEXTS = {
+  appTitle: 'Interaktives Quiz',
+  startScreenSubtitle: `Teste dein Wissen! Du hast ${TOTAL_QUIZ_TIME / 60} Minuten Zeit, um alle Fragen zu beantworten. Viel Erfolg!`,
+  startQuizButton: 'Quiz starten',
+  sidebarToggleOpen: 'Sidebar öffnen',
+  sidebarToggleClose: 'Sidebar schließen',
+  quizHeader: 'Quiz',
+  quizResultHeader: 'Quiz Ergebnis',
+  quizResultQuestionHeader: 'Quiz Ergebnis (Frage {questionNumber})',
+  previousButton: 'Vorherige',
+  backToResultsButton: 'Zurück zur Auswertung',
+  nextButton: 'Nächste',
+  submitQuizButton: 'Quiz beenden',
+  noQuestionsLoaded: 'Keine Fragen geladen.',
+  timeUpMessage: 'Die Zeit ist abgelaufen! Dein Quiz wurde automatisch beendet.',
+  questionLabel: 'Frage {current} von {total}',
+  explanationLabel: 'Erläuterung:',
+  timerLabel: 'Restzeit:',
+  resultsTitle: 'Quiz beendet!',
+  resultsCongratsPassed: 'Herzlichen Glückwunsch, bestanden!',
+  resultsSorryFailed: 'Leider nicht bestanden.',
+  resultsScoreSummary: 'Du hast {correctCount} von {totalQuestions} Fragen richtig beantwortet.',
+  resultsFinalScore: 'Ergebnis:',
+  retakeQuizButton: 'Quiz wiederholen',
+  resultsReviewTitle: 'Deine Antworten im Überblick:',
+  sidebarTitle: 'Prüfungsfragen', // Geändert von "Kursplan"
+  sidebarAnsweredTooltip: 'Beantwortet',
+  sidebarUnansweredTooltip: 'Unbeantwortet',
+};
+
+
 const App: React.FC = () => {
-  const [questions, setQuestions] = useState<Question[]>(QUIZ_QUESTIONS);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState<number>(0);
   const [userAnswers, setUserAnswers] = useState<Record<string, string[]>>({});
   const [quizStatus, setQuizStatus] = useState<QuizStatus>(QuizStatus.NOT_STARTED);
@@ -20,6 +51,8 @@ const App: React.FC = () => {
   const [showSidebar, setShowSidebar] = useState<boolean>(true);
   const [isReviewing, setIsReviewing] = useState<boolean>(false);
 
+  const questionsToDisplay = QUIZ_QUESTIONS; // Immer deutsche Fragen
+
   const resetQuiz = useCallback(() => {
     setCurrentQuestionIndex(0);
     setUserAnswers({});
@@ -28,7 +61,7 @@ const App: React.FC = () => {
     setPassed(false);
     setTimeLeft(TOTAL_QUIZ_TIME);
     setFinalResults([]);
-    setIsReviewing(false); // Reset review mode
+    setIsReviewing(false);
   }, []);
 
   const startQuiz = () => {
@@ -40,7 +73,7 @@ const App: React.FC = () => {
     if (quizStatus === QuizStatus.SUBMITTED || quizStatus === QuizStatus.TIME_UP) return;
 
     setUserAnswers((prevAnswers) => {
-      const currentQuestion = questions.find(q => q.id === questionId);
+      const currentQuestion = questionsToDisplay.find(q => q.id === questionId);
       if (!currentQuestion) return prevAnswers;
 
       const existingSelection = prevAnswers[questionId] || [];
@@ -48,7 +81,7 @@ const App: React.FC = () => {
 
       if (currentQuestion.type === QuestionType.SINGLE_CHOICE) {
         newSelection = [optionId];
-      } else { // MULTIPLE_CHOICE
+      } else {
         if (existingSelection.includes(optionId)) {
           newSelection = existingSelection.filter(id => id !== optionId);
         } else {
@@ -57,11 +90,11 @@ const App: React.FC = () => {
       }
       return { ...prevAnswers, [questionId]: newSelection };
     });
-  }, [questions, quizStatus]);
+  }, [questionsToDisplay, quizStatus]);
 
   const calculateResults = useCallback(() => {
     let correctCount = 0;
-    const results: QuestionResult[] = questions.map(q => {
+    const results: QuestionResult[] = questionsToDisplay.map(q => {
       const userAnswerSelection = userAnswers[q.id] || [];
       let isCorrect = false;
       if (q.type === QuestionType.SINGLE_CHOICE) {
@@ -83,54 +116,53 @@ const App: React.FC = () => {
       };
     });
     
-    const percentage = (correctCount / questions.length) * 100;
+    const percentage = (correctCount / questionsToDisplay.length) * 100;
     setScorePercentage(percentage);
     setPassed(percentage >= 51);
     setFinalResults(results);
     return { percentage, passedStatus: percentage >= 51, correctCount };
-  }, [userAnswers, questions]);
+  }, [userAnswers, questionsToDisplay]);
 
 
   const handleSubmitQuiz = useCallback(() => {
     calculateResults();
     setQuizStatus(QuizStatus.SUBMITTED);
-    setIsReviewing(false); // Show results page first
+    setIsReviewing(false);
     window.speechSynthesis.cancel(); 
   }, [calculateResults]);
 
   const handleTimeUp = useCallback(() => {
     calculateResults();
     setQuizStatus(QuizStatus.TIME_UP);
-    setIsReviewing(false); // Show results page first
+    setIsReviewing(false);
     window.speechSynthesis.cancel();
   }, [calculateResults]);
 
   const handleNextQuestion = () => {
-    if (currentQuestionIndex < questions.length - 1) {
+    if (currentQuestionIndex < questionsToDisplay.length - 1) {
       setCurrentQuestionIndex(prev => prev + 1);
     }
   };
 
   const handlePreviousQuestion = () => {
     if (currentQuestionIndex > 0) {
-      setCurrentQuestionIndex(prev => prev - 1);
+      setCurrentQuestionIndex(prev => prev + 1);
     }
   };
   
   const handleSidebarQuestionSelect = (index: number) => {
     setCurrentQuestionIndex(index);
     if (quizStatus === QuizStatus.SUBMITTED || quizStatus === QuizStatus.TIME_UP) {
-      setIsReviewing(true); // If quiz is over, selecting a question means reviewing it
+      setIsReviewing(true);
     }
   };
 
-
-  const getQuestionStatus = useCallback((questionId: string, userSelectedAnswers: string[]): 'correct' | 'incorrect' | 'unanswered' | 'answered' => {
+  const getQuestionStatus = useCallback((questionId: string, userSelectedAnswersForQuestion: string[]): 'correct' | 'incorrect' | 'unanswered' | 'answered' => {
     if (quizStatus !== QuizStatus.SUBMITTED && quizStatus !== QuizStatus.TIME_UP) {
-        return (userSelectedAnswers && userSelectedAnswers.length > 0) ? 'answered' : 'unanswered';
+        return (userSelectedAnswersForQuestion && userSelectedAnswersForQuestion.length > 0) ? 'answered' : 'unanswered';
     }
     
-    const question = questions.find(q => q.id === questionId);
+    const question = questionsToDisplay.find(q => q.id === questionId);
     if (!question) return 'unanswered';
 
     const result = finalResults.find(r => r.id === questionId);
@@ -140,57 +172,57 @@ const App: React.FC = () => {
     
     let isCorrect = false;
     if (question.type === QuestionType.SINGLE_CHOICE) {
-      isCorrect = userSelectedAnswers.length === 1 && question.correctAnswers.includes(userSelectedAnswers[0]);
+      isCorrect = userSelectedAnswersForQuestion.length === 1 && question.correctAnswers.includes(userSelectedAnswersForQuestion[0]);
     } else {
-      const sortedUserAnswers = [...(userSelectedAnswers || [])].sort();
+      const sortedUserAnswers = [...(userSelectedAnswersForQuestion || [])].sort();
       const sortedCorrectAnswers = [...question.correctAnswers].sort();
       isCorrect = sortedUserAnswers.length === sortedCorrectAnswers.length &&
                   sortedUserAnswers.every((val, index) => val === sortedCorrectAnswers[index]);
     }
     return isCorrect ? 'correct' : 'incorrect';
-  }, [questions, quizStatus, finalResults]);
+  }, [questionsToDisplay, quizStatus, finalResults]);
 
-
-  const currentQ = questions[currentQuestionIndex];
-  const currentUserAns = userAnswers[currentQ?.id] || [];
+  const currentQ = questionsToDisplay[currentQuestionIndex];
+  const currentUserAnsForCurrentQ = userAnswers[currentQ?.id] || [];
   
   if (quizStatus === QuizStatus.NOT_STARTED) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-blue-500 to-indigo-600 p-4">
         <div className="bg-white p-8 md:p-12 rounded-xl shadow-2xl text-center max-w-lg">
-          <h1 className="text-3xl md:text-4xl font-bold text-gray-800 mb-4">Interaktives Quiz</h1>
+          <h1 className="text-3xl md:text-4xl font-bold text-gray-800 mb-4">{UI_TEXTS.appTitle}</h1>
           <p className="text-gray-600 mb-8 text-lg">
-            Teste dein Wissen! Du hast {TOTAL_QUIZ_TIME / 60} Minuten Zeit, um alle Fragen zu beantworten.
-            Viel Erfolg!
+            {UI_TEXTS.startScreenSubtitle}
           </p>
           <button
             onClick={startQuiz}
             className="bg-primary hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-lg text-xl transition-transform transform hover:scale-105 focus:outline-none focus:ring-4 focus:ring-blue-300"
           >
-            Quiz starten
+            {UI_TEXTS.startQuizButton}
           </button>
         </div>
       </div>
     );
   }
 
-
   return (
     <div className="flex flex-col md:flex-row h-screen bg-lightgray">
        {showSidebar && (
         <Sidebar
-          questions={questions}
+          questions={questionsToDisplay}
           currentQuestionIndex={currentQuestionIndex}
           userAnswers={userAnswers}
           quizSubmitted={quizStatus === QuizStatus.SUBMITTED || quizStatus === QuizStatus.TIME_UP}
           onQuestionSelect={handleSidebarQuestionSelect}
-          getQuestionStatus={(qid, uans) => getQuestionStatus(qid, uans)}
+          getQuestionStatus={getQuestionStatus}
+          sidebarTitle={UI_TEXTS.sidebarTitle}
+          answeredTooltip={UI_TEXTS.sidebarAnsweredTooltip}
+          unansweredTooltip={UI_TEXTS.sidebarUnansweredTooltip}
         />
       )}
       <button 
         onClick={() => setShowSidebar(!showSidebar)} 
         className="md:hidden fixed top-2 left-2 z-50 bg-darkgray text-white p-2 rounded-md"
-        aria-label={showSidebar ? "Sidebar schließen" : "Sidebar öffnen"}
+        aria-label={showSidebar ? UI_TEXTS.sidebarToggleClose : UI_TEXTS.sidebarToggleOpen}
       >
         {showSidebar ? <ChevronLeftIcon /> : <ChevronRightIcon />}
       </button>
@@ -198,118 +230,110 @@ const App: React.FC = () => {
       <main className="flex-1 flex flex-col p-4 md:p-8 overflow-y-auto relative">
         <div className="flex justify-between items-center mb-6 flex-wrap gap-4">
           <h1 className="text-2xl md:text-3xl font-bold text-gray-800">
-            {quizStatus === QuizStatus.IN_PROGRESS && 'Quiz'}
-            {(quizStatus === QuizStatus.SUBMITTED || quizStatus === QuizStatus.TIME_UP) && !isReviewing && 'Quiz Ergebnis'}
-            {(quizStatus === QuizStatus.SUBMITTED || quizStatus === QuizStatus.TIME_UP) && isReviewing && `Quiz Ergebnis (Frage ${currentQuestionIndex + 1})`}
+            {quizStatus === QuizStatus.IN_PROGRESS && UI_TEXTS.quizHeader}
+            {(quizStatus === QuizStatus.SUBMITTED || quizStatus === QuizStatus.TIME_UP) && !isReviewing && UI_TEXTS.quizResultHeader}
+            {(quizStatus === QuizStatus.SUBMITTED || quizStatus === QuizStatus.TIME_UP) && isReviewing && UI_TEXTS.quizResultQuestionHeader.replace('{questionNumber}', (currentQuestionIndex + 1).toString())}
           </h1>
-          {(quizStatus === QuizStatus.IN_PROGRESS) && (
-            <TimerDisplay initialTime={timeLeft} onTimeUp={handleTimeUp} isRunning={quizStatus === QuizStatus.IN_PROGRESS} />
-          )}
+          <div className="flex items-center gap-4">
+            {(quizStatus === QuizStatus.IN_PROGRESS) && (
+              <TimerDisplay 
+                initialTime={timeLeft} 
+                onTimeUp={handleTimeUp} 
+                isRunning={quizStatus === QuizStatus.IN_PROGRESS}
+                timerLabel={UI_TEXTS.timerLabel}
+              />
+            )}
+          </div>
         </div>
 
         {isReviewing && (quizStatus === QuizStatus.SUBMITTED || quizStatus === QuizStatus.TIME_UP) && currentQ ? (
-          // Reviewing a specific question
           <>
             <QuestionDisplay
               question={currentQ}
-              userSelectedAnswers={currentUserAns}
-              onAnswerSelect={() => {}} // No answer selection in review mode
+              userSelectedAnswers={currentUserAnsForCurrentQ}
+              onAnswerSelect={() => {}}
               quizStatus={quizStatus}
               questionNumber={currentQuestionIndex + 1}
-              totalQuestions={questions.length}
-              questionStatus={getQuestionStatus(currentQ.id, currentUserAns)}
+              totalQuestions={questionsToDisplay.length}
+              questionStatus={getQuestionStatus(currentQ.id, currentUserAnsForCurrentQ)}
+              questionLabel={UI_TEXTS.questionLabel}
+              explanationLabel={UI_TEXTS.explanationLabel}
             />
             <div className="mt-8 flex flex-col sm:flex-row justify-between items-center space-y-4 sm:space-y-0 sm:space-x-4">
-              <button
-                onClick={handlePreviousQuestion}
-                disabled={currentQuestionIndex === 0}
-                className="w-full sm:w-auto flex items-center justify-center bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold py-2.5 px-6 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <ChevronLeftIcon className="mr-2" />
-                Vorherige
+              <button onClick={handlePreviousQuestion} disabled={currentQuestionIndex === 0} className="w-full sm:w-auto btn-secondary">
+                <ChevronLeftIcon className="mr-2" /> {UI_TEXTS.previousButton}
               </button>
-              <button
-                onClick={() => setIsReviewing(false)}
-                className="w-full sm:w-auto flex items-center justify-center bg-gray-500 hover:bg-gray-600 text-white font-semibold py-2.5 px-6 rounded-lg transition-colors"
-              >
-                Zurück zur Auswertung
+              <button onClick={() => setIsReviewing(false)} className="w-full sm:w-auto btn-neutral">
+                {UI_TEXTS.backToResultsButton}
               </button>
-              <button
-                onClick={handleNextQuestion}
-                disabled={currentQuestionIndex === questions.length - 1}
-                className="w-full sm:w-auto flex items-center justify-center bg-primary hover:bg-blue-700 text-white font-semibold py-2.5 px-6 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Nächste
-                <ChevronRightIcon className="ml-2" />
+              <button onClick={handleNextQuestion} disabled={currentQuestionIndex === questionsToDisplay.length - 1} className="w-full sm:w-auto btn-primary">
+                {UI_TEXTS.nextButton} <ChevronRightIcon className="ml-2" />
               </button>
             </div>
           </>
         ) : (quizStatus === QuizStatus.SUBMITTED || quizStatus === QuizStatus.TIME_UP) ? (
-          // Showing ResultsDisplay
           <ResultsDisplay
             scorePercentage={scorePercentage}
             passed={passed}
-            totalQuestions={questions.length}
+            totalQuestions={questionsToDisplay.length}
             correctAnswersCount={finalResults.filter(r => r.isCorrect).length}
             onRetakeQuiz={startQuiz}
-            results={finalResults}
+            results={finalResults} 
             onReviewQuestion={(index) => {
               setCurrentQuestionIndex(index);
               setIsReviewing(true);
             }}
+            texts={UI_TEXTS} // Pass all UI texts
           />
         ) : currentQ ? (
-          // Quiz in Progress
           <>
             <QuestionDisplay
               question={currentQ}
-              userSelectedAnswers={currentUserAns}
+              userSelectedAnswers={currentUserAnsForCurrentQ}
               onAnswerSelect={(optionId) => handleAnswerSelect(currentQ.id, optionId)}
               quizStatus={quizStatus}
               questionNumber={currentQuestionIndex + 1}
-              totalQuestions={questions.length}
-              questionStatus={ getQuestionStatus(currentQ.id, currentUserAns) }
+              totalQuestions={questionsToDisplay.length}
+              questionStatus={ getQuestionStatus(currentQ.id, currentUserAnsForCurrentQ) }
+              questionLabel={UI_TEXTS.questionLabel}
+              explanationLabel={UI_TEXTS.explanationLabel}
             />
             <div className="mt-8 flex flex-col sm:flex-row justify-between items-center space-y-4 sm:space-y-0 sm:space-x-4">
-              <button
-                onClick={handlePreviousQuestion}
-                disabled={currentQuestionIndex === 0}
-                className="w-full sm:w-auto flex items-center justify-center bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold py-2.5 px-6 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <ChevronLeftIcon className="mr-2" />
-                Vorherige
+              <button onClick={handlePreviousQuestion} disabled={currentQuestionIndex === 0} className="w-full sm:w-auto btn-secondary">
+                <ChevronLeftIcon className="mr-2" /> {UI_TEXTS.previousButton}
               </button>
-              {currentQuestionIndex === questions.length - 1 ? (
-                <button
-                  onClick={handleSubmitQuiz}
-                  className="w-full sm:w-auto flex items-center justify-center bg-secondary hover:bg-emerald-600 text-white font-semibold py-2.5 px-6 rounded-lg transition-colors"
-                >
-                  <SubmitIcon className="mr-2" />
-                  Quiz beenden
+              {currentQuestionIndex === questionsToDisplay.length - 1 ? (
+                <button onClick={handleSubmitQuiz} className="w-full sm:w-auto btn-success">
+                  <SubmitIcon className="mr-2" /> {UI_TEXTS.submitQuizButton}
                 </button>
               ) : (
-                <button
-                  onClick={handleNextQuestion}
-                  disabled={currentQuestionIndex === questions.length - 1}
-                  className="w-full sm:w-auto flex items-center justify-center bg-primary hover:bg-blue-700 text-white font-semibold py-2.5 px-6 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Nächste
-                  <ChevronRightIcon className="ml-2" />
+                <button onClick={handleNextQuestion} disabled={currentQuestionIndex === questionsToDisplay.length - 1} className="w-full sm:w-auto btn-primary">
+                  {UI_TEXTS.nextButton} <ChevronRightIcon className="ml-2" />
                 </button>
               )}
             </div>
           </>
         ) : (
-          <p>Keine Fragen geladen.</p>
+          <p>{UI_TEXTS.noQuestionsLoaded}</p>
         )}
          {quizStatus === QuizStatus.TIME_UP && !isReviewing && (
             <div className="mt-4 p-4 bg-red-100 text-red-700 rounded-lg text-center font-semibold">
-                Die Zeit ist abgelaufen! Dein Quiz wurde automatisch beendet.
+                {UI_TEXTS.timeUpMessage}
             </div>
         )}
       </main>
     </div>
   );
 };
+
+// Helper for button styling
+const buttonBaseStyles = "flex items-center justify-center font-semibold py-2.5 px-6 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed";
+(React.createElement as any)('style', null, `
+  .btn-primary { @apply bg-gray-500 hover:bg-primary text-white ${buttonBaseStyles}; }
+  .btn-secondary { @apply bg-gray-500 hover:bg-primary text-white ${buttonBaseStyles}; }
+  .btn-success { @apply bg-secondary hover:bg-emerald-600 text-white ${buttonBaseStyles}; }
+  .btn-neutral { @apply bg-gray-500 hover:bg-gray-600 text-white ${buttonBaseStyles}; }
+`);
+
 
 export default App;
